@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🇲🇦 Voyage au Maroc</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+:root { --terracotta:#C0522A; --gold:#D4A843; --sand:#F5E6C8; --deep:#1A0A00; --green:#2D5A3D; --light:#FDF8F0; }
+body { font-family:'Segoe UI',sans-serif; background:var(--light); color:var(--deep); }
+
+header {
+  background:linear-gradient(135deg,var(--terracotta) 0%,#8B2500 50%,var(--deep) 100%);
+  padding:35px 20px 25px; text-align:center; position:relative; overflow:hidden;
+}
+header::before {
+  content:''; position:absolute; inset:0;
+  background:url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 5 L55 20 L55 40 L30 55 L5 40 L5 20Z' fill='none' stroke='rgba(212,168,67,0.15)' stroke-width='1'/%3E%3C/svg%3E") repeat; opacity:0.4;
+}
+header h1 { font-size:2.2em; color:var(--gold); letter-spacing:3px; text-transform:uppercase; position:relative; }
+header .subtitle { color:var(--sand); margin-top:8px; font-size:1.05em; position:relative; }
+header .dates { color:var(--gold); font-size:0.9em; margin-top:4px; position:relative; opacity:0.9; }
+
+/* MAP SECTION */
+#map-section { position:relative; background:#111; }
+#map { width:100%; height:480px; }
+
+/* FILTRES par jour — sur la carte */
+#map-filters {
+  position:absolute; top:12px; left:50%; transform:translateX(-50%);
+  display:flex; gap:6px; flex-wrap:wrap; justify-content:center;
+  z-index:10; padding:0 10px; max-width:100%;
+}
+.mf-btn {
+  padding:6px 13px; border-radius:20px; border:none; cursor:pointer;
+  font-size:0.75em; font-weight:700; color:white;
+  box-shadow:0 2px 8px rgba(0,0,0,0.5); transition:all 0.2s;
+  white-space:nowrap; opacity:0.75;
+}
+.mf-btn.all { background:#333; }
+.mf-btn:hover { opacity:1; transform:scale(1.05); }
+.mf-btn.active { opacity:1; box-shadow:0 3px 12px rgba(0,0,0,0.6); }
+
+/* Popup Mapbox custom */
+.leaflet-popup-content-wrapper { border-radius:10px !important; padding:0 !important; box-shadow:0 4px 20px rgba(0,0,0,0.35) !important; overflow:hidden; }
+.leaflet-popup-content { margin:0 !important; }
+.mpop { padding:11px 14px; font-family:'Segoe UI',sans-serif; }
+.mpop .mp-name { font-weight:700; font-size:0.93em; }
+.mpop .mp-day { font-size:0.78em; font-weight:600; margin-top:3px; }
+.mpop a { display:inline-block; margin-top:8px; font-size:0.75em; color:white; padding:4px 12px; border-radius:10px; text-decoration:none; font-weight:700; }
+
+/* NAV */
+nav {
+  display:flex; overflow-x:auto; gap:6px; padding:12px 15px;
+  background:white; border-bottom:2px solid var(--sand);
+  position:sticky; top:0; z-index:100; box-shadow:0 2px 8px rgba(0,0,0,0.08);
+}
+nav::-webkit-scrollbar { height:4px; }
+nav::-webkit-scrollbar-thumb { background:var(--gold); border-radius:2px; }
+nav button {
+  flex-shrink:0; padding:7px 14px; border:2px solid var(--sand);
+  background:white; border-radius:20px; cursor:pointer;
+  font-size:0.82em; font-weight:600; color:var(--deep);
+  transition:all 0.2s; white-space:nowrap;
+}
+nav button:hover, nav button.active { background:var(--terracotta); border-color:var(--terracotta); color:white; }
+
+main { max-width:750px; margin:0 auto; padding:20px 15px 60px; }
+.day-card { display:none; animation:fadeIn 0.3s ease; }
+.day-card.active { display:block; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+
+.day-header { display:flex; align-items:center; gap:15px; margin-bottom:20px; padding-bottom:15px; border-bottom:2px solid var(--sand); }
+.day-num { color:white; width:55px; height:55px; border-radius:50%; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:0.7em; font-weight:700; text-transform:uppercase; flex-shrink:0; }
+.day-num span { font-size:1.8em; line-height:1; }
+.day-title h2 { font-size:1.3em; }
+.day-title p { font-size:0.85em; color:#888; margin-top:3px; }
+
+.activities { display:flex; flex-direction:column; gap:10px; }
+.activity { display:flex; align-items:flex-start; gap:12px; padding:12px 15px; background:white; border-radius:10px; border-left:4px solid var(--sand); box-shadow:0 1px 4px rgba(0,0,0,0.06); transition:transform 0.15s; }
+.activity:hover { transform:translateX(3px); }
+.activity.transport { border-left-color:#5B8DB8; }
+.activity.food { border-left-color:var(--green); }
+.activity.visit { border-left-color:var(--gold); }
+.activity.sleep { border-left-color:var(--terracotta); }
+.activity.arrival { border-left-color:#9B59B6; }
+.activity.info { border-left-color:#95A5A6; }
+.activity-icon { font-size:1.4em; flex-shrink:0; margin-top:1px; }
+.activity-content { flex:1; }
+.activity-content .name { font-weight:600; font-size:0.95em; }
+.activity-content .detail { font-size:0.82em; color:#777; margin-top:3px; }
+.activity-cost { font-size:0.82em; font-weight:700; color:var(--terracotta); background:#FFF0E8; padding:3px 8px; border-radius:10px; white-space:nowrap; align-self:center; }
+
+.cost-summary { background:linear-gradient(135deg,var(--deep),#3D1500); border-radius:12px; padding:18px 20px; margin-top:20px; color:white; }
+.cost-summary h3 { color:var(--gold); font-size:0.85em; text-transform:uppercase; letter-spacing:1px; margin-bottom:12px; }
+.cost-row { display:flex; justify-content:space-between; font-size:0.88em; padding:5px 0; border-bottom:1px solid rgba(255,255,255,0.08); }
+.cost-row:last-child { border:none; font-weight:700; font-size:1em; color:var(--gold); margin-top:5px; padding-top:8px; }
+
+.total-overview { background:linear-gradient(135deg,var(--terracotta),#8B2500); border-radius:12px; padding:20px; margin-top:25px; color:white; text-align:center; }
+.total-overview h3 { color:var(--gold); margin-bottom:15px; font-size:1em; text-transform:uppercase; letter-spacing:2px; }
+.total-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+.total-cell { background:rgba(0,0,0,0.2); border-radius:8px; padding:12px 8px; }
+.total-cell .label { font-size:0.72em; opacity:0.8; text-transform:uppercase; margin-bottom:5px; }
+.total-cell .val { font-size:1.3em; font-weight:700; color:var(--gold); }
+
+.overview-list { display:flex; flex-direction:column; gap:8px; }
+.ov-day { background:white; border-radius:10px; padding:13px 16px; display:flex; align-items:center; gap:12px; box-shadow:0 1px 4px rgba(0,0,0,0.06); cursor:pointer; transition:all 0.15s; border-left:4px solid; }
+.ov-day:hover { transform:translateX(3px); }
+.ov-day .ov-date { font-weight:700; min-width:80px; font-size:0.9em; }
+.ov-day .ov-loc { flex:1; font-size:0.88em; }
+.ov-day .ov-cost { font-size:0.85em; font-weight:700; color:var(--terracotta); background:#FFF0E8; padding:4px 10px; border-radius:10px; }
+.section-title { font-size:0.75em; text-transform:uppercase; letter-spacing:2px; color:#AAA; margin:20px 0 10px; font-weight:700; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Voyage au Maroc</h1>
+  <p class="subtitle">Maylis & Romain</p>
+  <p class="dates">4 avril — 14 avril 2026</p>
+</header>
+
+<div id="map-section">
+  <div id="map"></div>
+  <div id="map-filters"></div>
+</div>
+
+<nav id="nav"></nav>
+<main id="main"></main>
+
+<script>
+// ── COULEURS & JOURS ──────────────────────────────────────────
+const DAYS = [
+  { id:0, label:'4 avr',  color:'#E05C2A' },
+  { id:1, label:'5 avr',  color:'#E8A020' },
+  { id:2, label:'6 avr',  color:'#27AE60' },
+  { id:3, label:'7 avr',  color:'#2980B9' },
+  { id:4, label:'8 avr',  color:'#8E44AD' },
+  { id:5, label:'9 avr',  color:'#C0392B' },
+  { id:6, label:'10 avr', color:'#D35400' },
+  { id:7, label:'11 avr', color:'#16A085' },
+  { id:8, label:'12 avr', color:'#1A6EBD' },
+  { id:9, label:'13 avr', color:'#7D3C98' },
+  { id:10,label:'14 avr', color:'#B7950B' },
+];
+
+// ── STOPS ─────────────────────────────────────────────────────
+const STOPS = [
+  { di:0,  name:'Marrakech — Arrivée',    lat:31.6295, lng:-7.9811 },
+  { di:1,  name:'Marrakech — Visites',    lat:31.6330, lng:-7.9870 },
+  { di:2,  name:"Vallée de l'Ourika",     lat:31.3500, lng:-7.6500 },
+  { di:2,  name:'Cascades Setti Fatma',   lat:31.2250, lng:-7.6700 },
+  { di:3,  name:'Agadir',                 lat:30.4278, lng:-9.5981 },
+  { di:3,  name:'Taghazout',              lat:30.5444, lng:-9.7083 },
+  { di:3,  name:'Color Village',          lat:30.6200, lng:-9.7350 },
+  { di:3,  name:'Timlaline Sand Dune',    lat:30.7600, lng:-9.7800 },
+  { di:3,  name:'Essaouira',              lat:31.5085, lng:-9.7595 },
+  { di:4,  name:'Chichaoua',               lat:31.5400, lng:-8.7640 },
+  { di:4,  name:"Désert d'Agafay",        lat:31.4167, lng:-8.2667 },
+  { di:5,  name:"Tizi n'Tichka",          lat:31.2050, lng:-7.3700 },
+  { di:5,  name:'Ouarzazate',             lat:30.9189, lng:-6.8934 },
+  { di:5,  name:'Skoura',                 lat:31.0600, lng:-6.5580 },
+  { di:5,  name:'Gorges du Dadès',        lat:31.4532, lng:-5.9676 },
+  { di:6,  name:'Gorges du Todra',        lat:31.5875, lng:-5.5929 },
+  { di:6,  name:'Merzouga',               lat:31.0802, lng:-4.0134 },
+  { di:7,  name:'Ziz Gorges',             lat:32.0500, lng:-4.6500 },
+  { di:7,  name:"Forêt d'Azrou",          lat:33.4378, lng:-5.2219 },
+  { di:7,  name:'Ifrane',                 lat:33.5333, lng:-5.1000 },
+  { di:7,  name:'Fès',                    lat:34.0181, lng:-5.0078 },
+  { di:8,  name:'Chefchaouen',            lat:35.1688, lng:-5.2636 },
+  { di:8,  name:'Akchour Waterfalls',     lat:35.2800, lng:-5.1500 },
+  { di:8,  name:'Rabat',                  lat:33.9716, lng:-6.8498 },
+  { di:9,  name:'Casablanca',             lat:33.5731, lng:-7.5898 },
+  { di:9,  name:'Marrakech — Retour',     lat:31.6295, lng:-7.9811 },
+  { di:10, name:'Marrakech — Départ',     lat:31.6350, lng:-7.9900 },
+];
+
+// ── LEAFLET MAP ───────────────────────────────────────────────
+const map = L.map('map', { zoomControl:false, scrollWheelZoom:false }).setView([31.8, -6.5], 5.5);
+L.control.zoom({ position:'bottomright' }).addTo(map);
+
+// OpenStreetMap — fonctionne partout, style détaillé
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom:19, attribution:'© OpenStreetMap'
+}).addTo(map);
+
+// ── LAYERS PAR JOUR ───────────────────────────────────────────
+const layerGroups = {}; // di -> L.layerGroup
+const markerRefs = [];  // { el, di, latlng }
+let activeDay = null;
+
+// Grouper les stops
+const byDay = {};
+STOPS.forEach((s, i) => {
+  if (!byDay[s.di]) byDay[s.di] = [];
+  byDay[s.di].push({ ...s, gi: i });
+});
+
+DAYS.forEach(({ id:di, color }) => {
+  if (!byDay[di]) return;
+  const group = L.layerGroup();
+  const stops = byDay[di];
+
+  // Ligne depuis le stop précédent global
+  const firstGi = stops[0].gi;
+  if (firstGi > 0) {
+    const prev = STOPS[firstGi - 1];
+    L.polyline([[prev.lat, prev.lng],[stops[0].lat, stops[0].lng]], { color, weight:4, opacity:0.9 }).addTo(group);
+  }
+  for (let i = 1; i < stops.length; i++) {
+    const a = stops[i-1], b = stops[i];
+    L.polyline([[a.lat,a.lng],[b.lat,b.lng]], { color, weight:4, opacity:0.9 }).addTo(group);
+  }
+
+  // Markers
+  stops.forEach(({ name, lat, lng, gi }) => {
+    const el = document.createElement('div');
+    el.style.cssText = `background:${color};color:white;border:2.5px solid white;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;box-shadow:0 2px 10px rgba(0,0,0,0.6);cursor:pointer;transition:transform 0.15s;`;
+    el.textContent = gi + 1;
+
+    const icon = L.divIcon({ className:'', html:el.outerHTML, iconSize:[26,26], iconAnchor:[13,13] });
+    const gmUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+    const dayLabel = DAYS[di].label;
+    const popup = L.popup({ offset:[0,-5], closeButton:false, maxWidth:200 }).setContent(`
+      <div class="mpop">
+        <div class="mp-name">${name}</div>
+        <div class="mp-day" style="color:${color}">${dayLabel}</div>
+        <a href="${gmUrl}" target="_blank" style="background:${color}">📍 Google Maps</a>
+      </div>`);
+    L.marker([lat,lng], { icon }).addTo(group).bindPopup(popup);
+    markerRefs.push({ di, lat, lng });
+  });
+
+  layerGroups[di] = group;
+  group.addTo(map);
+});
+
+// ── FILTRE ────────────────────────────────────────────────────
+function applyFilter(di) {
+  if (activeDay === di) di = null;
+  activeDay = di;
+
+  DAYS.forEach(({ id }) => {
+    if (!layerGroups[id]) return;
+    if (di === null || id === di) map.addLayer(layerGroups[id]);
+    else map.removeLayer(layerGroups[id]);
+  });
+
+  if (di !== null) {
+    const pts = (byDay[di] || []).map(s => [s.lat, s.lng]);
+    if (pts.length === 1) map.flyTo(pts[0], 11, { duration:1 });
+    else map.flyToBounds(L.latLngBounds(pts).pad(0.35), { duration:1 });
+  } else {
+    map.flyTo([31.8, -6.5], 5.5, { duration:1 });
+  }
+
+  document.querySelectorAll('.mf-btn').forEach(btn => {
+    const bdi = btn.dataset.di;
+    const isActive = bdi === 'all' ? di === null : parseInt(bdi) === di;
+    btn.classList.toggle('active', isActive);
+    btn.style.opacity = (di === null || isActive) ? '1' : '0.4';
+  });
+}
+
+// ── BOUTONS FILTRES ────────────────────────────────────────────
+const filtersEl = document.getElementById('map-filters');
+const allBtn = document.createElement('button');
+allBtn.className = 'mf-btn all active'; allBtn.textContent = 'Tout'; allBtn.dataset.di = 'all';
+allBtn.onclick = () => applyFilter(null);
+filtersEl.appendChild(allBtn);
+
+DAYS.forEach(d => {
+  const btn = document.createElement('button');
+  btn.className = 'mf-btn'; btn.style.background = d.color;
+  btn.textContent = d.label; btn.dataset.di = d.id;
+  btn.onclick = () => applyFilter(d.id);
+  filtersEl.appendChild(btn);
+});
+
+// ── DAYS DATA ─────────────────────────────────────────────────
+const days = [
+  { id:'overview', label:'📋 Vue d\'ensemble', date:'', location:'', activities:[] },
+  { id:'d1', label:'4 avr', date:'Vendredi 4 avril', location:'Marrakech', color:DAYS[0].color, di:0,
+    activities:[
+      {type:'arrival',icon:'✈️',name:'Arrivée Maylis',detail:'22h35',cost:null},
+      {type:'arrival',icon:'✈️',name:'Arrivée Romain',detail:'23h15',cost:null},
+      {type:'transport',icon:'🚗',name:'Récupération de la voiture',detail:null,cost:null},
+      {type:'food',icon:'🍽️',name:'Repas à l\'extérieur',detail:null,cost:'10 €/pers'},
+      {type:'sleep',icon:'🏨',name:'Logement à Marrakech',detail:'1ère nuit',cost:'31,50 €/pers'},
+    ], costs:[{label:'Repas',val:'10 €'},{label:'Logement',val:'31,50 €'}], total:41.5 },
+  { id:'d2', label:'5 avr', date:'Samedi 5 avril', location:'Marrakech', color:DAYS[1].color, di:1,
+    activities:[
+      {type:'visit',icon:'🏛️',name:'Palais de la Bahia',detail:'Via GetYourGuide',cost:'10 €'},
+      {type:'visit',icon:'🌿',name:'Jardins Majorelle + Musée YSL + Arts berbères',detail:'Via GetYourGuide',cost:'33 €'},
+      {type:'visit',icon:'🕌',name:'Médersa Ben Youssef',detail:'Via GetYourGuide',cost:'5 €'},
+      {type:'food',icon:'🍽️',name:'Repas midi',detail:null,cost:'10 €/pers'},
+      {type:'visit',icon:'🛍️',name:'Balade dans les souks',detail:null,cost:null},
+      {type:'visit',icon:'🚣',name:'Waterkarting',detail:null,cost:'40 €/pers'},
+      {type:'food',icon:'🍽️',name:'Repas soir',detail:null,cost:'15 €/pers'},
+      {type:'visit',icon:'🌙',name:'Soirée Jemaa el-Fna',detail:null,cost:null},
+      {type:'sleep',icon:'🏨',name:'Logement Marrakech',detail:'2ème nuit',cost:'inclus'},
+    ], costs:[{label:'Visites',val:'48 €'},{label:'Repas',val:'25 €'},{label:'Waterkarting',val:'40 €'}], total:113 },
+  { id:'d3', label:'6 avr', date:'Dimanche 6 avril', location:"Vallée de l'Ourika", color:DAYS[2].color, di:2,
+    activities:[
+      {type:'info',icon:'📍',name:'RDV GetYourGuide',detail:'9h00',cost:null},
+      {type:'visit',icon:'🏔️',name:"Vallée de l'Ourika",detail:'Repas inclus',cost:'10 €/pers'},
+      {type:'visit',icon:'💧',name:'Cascades de Setti Fatma',detail:null,cost:null},
+      {type:'food',icon:'🍽️',name:'Repas soir',detail:null,cost:'10 €/pers'},
+      {type:'sleep',icon:'🏨',name:'Logement Marrakech',detail:'3ème nuit',cost:'inclus'},
+    ], costs:[{label:"Vallée Ourika",val:'10 €'},{label:'Repas soir',val:'10 €'}], total:20 },
+  { id:'d4', label:'7 avr', date:'Lundi 7 avril', location:'Marrakech → Essaouira', color:DAYS[3].color, di:3,
+    activities:[
+      {type:'transport',icon:'🚗',name:'Marrakech → Agadir',detail:'3h08',cost:null},
+      {type:'food',icon:'🍽️',name:'Repas à Agadir',detail:null,cost:'10 €/pers'},
+      {type:'transport',icon:'🚗',name:'Agadir → Taghazout',detail:'28 min',cost:null},
+      {type:'visit',icon:'🎨',name:'Color Village',detail:'13 min de Taghazout',cost:null},
+      {type:'visit',icon:'🌅',name:'Timlaline Sand Dune',detail:'36 min — Coucher de soleil',cost:null},
+      {type:'transport',icon:'🚗',name:'Timlaline → Essaouira',detail:'1h49',cost:null},
+      {type:'food',icon:'🍽️',name:'Repas à Essaouira',detail:null,cost:'10 €/pers'},
+      {type:'sleep',icon:'🏨',name:'Dodo à Essaouira',detail:null,cost:'11 €/pers'},
+    ], costs:[{label:'Repas',val:'20 €'},{label:'Logement',val:'11 €'}], total:31 },
+  { id:'d5', label:'8 avr', date:'Mardi 8 avril', location:"Désert d'Agafay", color:DAYS[4].color, di:4,
+    activities:[
+      {type:'transport',icon:'🚗',name:'Essaouira → Agafay',detail:'2h28',cost:null},
+      {type:'food',icon:'🍽️',name:'Repas à Chichaoua',detail:null,cost:'10 €/pers'},
+      {type:'visit',icon:'🐪',name:"Désert d'Agafay",detail:'Chameau, quad & dîner spectacle 16h',cost:'19 €/pers'},
+      {type:'sleep',icon:'⛺',name:'Dodo dans le désert',detail:null,cost:'25 €/pers'},
+    ], costs:[{label:'Repas',val:'10 €'},{label:'Désert Agafay',val:'19 €'},{label:'Logement',val:'25 €'}], total:54 },
+  { id:'d6', label:'9 avr', date:'Mercredi 9 avril', location:'Gorges du Dadès', color:DAYS[5].color, di:5,
+    activities:[
+      {type:'transport',icon:'🚗',name:"Agafay → Tizi n'Tichka → Ouarzazate",detail:'4h05',cost:null},
+      {type:'food',icon:'🍽️',name:'Repas à Ouarzazate',detail:null,cost:'10 €/pers'},
+      {type:'transport',icon:'🚗',name:'→ Skoura → Gorges du Dadès',detail:'2h24',cost:null},
+      {type:'food',icon:'🍽️',name:'Repas Gorges du Dadès',detail:null,cost:'10 €/pers'},
+      {type:'sleep',icon:'🏨',name:'Dodo Gorges du Dadès',detail:null,cost:'6 €/pers'},
+    ], costs:[{label:'Repas',val:'20 €'},{label:'Logement',val:'6 €'}], total:26 },
+  { id:'d7', label:'10 avr', date:'Jeudi 10 avril', location:'Merzouga', color:DAYS[6].color, di:6,
+    activities:[
+      {type:'transport',icon:'🚗',name:'Dadès → Todra → Merzouga',detail:'4h16',cost:null},
+      {type:'food',icon:'🍽️',name:'Repas à Merzouga',detail:null,cost:'10 €/pers'},
+      {type:'visit',icon:'🐪',name:'Chameau + Sandboard',detail:'16h-17h, repas inclus',cost:null},
+      {type:'sleep',icon:'🏕️',name:'Dodo à Merzouga',detail:null,cost:'1 €/pers'},
+    ], costs:[{label:'Repas',val:'10 €'},{label:'Logement',val:'1 €'}], total:11 },
+  { id:'d8', label:'11 avr', date:'Vendredi 11 avril', location:'Fès', color:DAYS[7].color, di:7,
+    activities:[
+      {type:'transport',icon:'🚗',name:'Merzouga → Ziz Gorges',detail:'2h03',cost:null},
+      {type:'food',icon:'🍽️',name:'Repas à Ziz Gorges',detail:null,cost:'10 €/pers'},
+      {type:'transport',icon:'🚗',name:"Ziz Gorges → Forêt d'Azrou",detail:"4h04 — Singes sauvages",cost:null},
+      {type:'visit',icon:'🐒',name:"Forêt d'Azrou",detail:'Singes sauvages !',cost:null},
+      {type:'transport',icon:'🚗',name:"Forêt d'Azrou → Ifrane",detail:'25 min',cost:null},
+      {type:'visit',icon:'🏘️',name:'Ifrane',detail:'Ville surprenante',cost:null},
+      {type:'transport',icon:'🚗',name:'Ifrane → Fès',detail:'1h16',cost:null},
+      {type:'food',icon:'🍽️',name:'Repas à Fès',detail:null,cost:'10 €/pers'},
+      {type:'sleep',icon:'🏨',name:'Dodo à Fès',detail:null,cost:'16,50 €/pers'},
+    ], costs:[{label:'Repas',val:'20 €'},{label:'Logement',val:'16,50 €'}], total:36.5 },
+  { id:'d9', label:'12 avr', date:'Samedi 12 avril', location:'Chefchaouen → Rabat', color:DAYS[8].color, di:8,
+    activities:[
+      {type:'visit',icon:'🏺',name:'Chouara Tannery — Fès',detail:null,cost:null},
+      {type:'transport',icon:'🚗',name:'Fès → Chefchaouen',detail:'3h44',cost:null},
+      {type:'food',icon:'🍽️',name:'Repas à Chefchaouen',detail:null,cost:'10 €/pers'},
+      {type:'visit',icon:'💧',name:'Akchour Waterfalls',detail:null,cost:null},
+      {type:'transport',icon:'🚗',name:'→ Rabat',detail:'4h08',cost:null},
+      {type:'food',icon:'🍽️',name:'Repas à Rabat',detail:null,cost:'10 €/pers'},
+      {type:'sleep',icon:'🏨',name:'Dodo à Rabat',detail:null,cost:'12 €/pers'},
+    ], costs:[{label:'Repas',val:'20 €'},{label:'Logement',val:'12 €'}], total:32 },
+  { id:'d10', label:'13 avr', date:'Dimanche 13 avril', location:'Rabat → Casablanca → Marrakech', color:DAYS[9].color, di:9,
+    activities:[
+      {type:'visit',icon:'🕌',name:'Hassan Tower + Jardins Andalous',detail:'Rabat',cost:null},
+      {type:'visit',icon:'🏖️',name:'Plage de Rabat',detail:null,cost:null},
+      {type:'food',icon:'🍽️',name:'Repas plage',detail:null,cost:'10 €/pers'},
+      {type:'transport',icon:'🚗',name:'Rabat → Casablanca → Marrakech',detail:'3h54',cost:null},
+      {type:'food',icon:'🍽️',name:'Repas à Marrakech',detail:null,cost:'10 €/pers'},
+      {type:'sleep',icon:'🏨',name:'Dodo à Marrakech',detail:null,cost:'17,50 €/pers'},
+    ], costs:[{label:'Repas',val:'20 €'},{label:'Logement',val:'17,50 €'}], total:37.5 },
+  { id:'d11', label:'14 avr', date:'Lundi 14 avril', location:'Marrakech — Départ', color:DAYS[10].color, di:10,
+    activities:[
+      {type:'visit',icon:'🎈',name:'Montgolfière',detail:'6h — À confirmer',cost:'93 €/pers ???'},
+      {type:'visit',icon:'🛍️',name:'Chill / Médina',detail:null,cost:null},
+      {type:'food',icon:'🍽️',name:'Repas à Marrakech',detail:null,cost:'10 €/pers'},
+      {type:'arrival',icon:'✈️',name:'Départ Maylis',detail:'14h40',cost:null},
+    ], costs:[{label:'Montgolfière (optionnel)',val:'93 €'},{label:'Repas',val:'10 €'}], total:103 },
+];
+
+// ── BUILD NAV ─────────────────────────────────────────────────
+const nav = document.getElementById('nav');
+days.forEach((d, i) => {
+  const btn = document.createElement('button');
+  btn.textContent = d.label;
+  btn.dataset.id = d.id;
+  if (i === 0) btn.classList.add('active');
+  btn.onclick = () => {
+    document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.day-card').forEach(c => c.classList.remove('active'));
+    document.getElementById(d.id).classList.add('active');
+    if (d.di !== undefined) applyFilter(d.di);
+    else applyFilter(null);
+  };
+  nav.appendChild(btn);
+});
+
+// ── BUILD MAIN ────────────────────────────────────────────────
+const mainEl = document.getElementById('main');
+const dayData = days.filter(d => d.date);
+
+// OVERVIEW
+const ovCard = document.createElement('div');
+ovCard.className = 'day-card active'; ovCard.id = 'overview';
+let ovHtml = `<div class="section-title">📅 Programme jour par jour</div><div class="overview-list">`;
+dayData.forEach(d => {
+  ovHtml += `<div class="ov-day" style="border-left-color:${d.color}" onclick="document.querySelector('[data-id=${d.id}]').click()">
+    <div class="ov-date" style="color:${d.color}">${d.label}</div>
+    <div class="ov-loc">${d.location}</div>
+    <div class="ov-cost">${d.total} €</div>
+  </div>`;
+});
+ovHtml += `</div>
+<div class="total-overview" style="margin-top:25px">
+  <h3>💰 Budget estimé total (par personne)</h3>
+  <div class="total-grid">
+    <div class="total-cell"><div class="label">Logements</div><div class="val">121,50 €</div></div>
+    <div class="total-cell"><div class="label">Repas</div><div class="val">~185 €</div></div>
+    <div class="total-cell"><div class="label">Activités</div><div class="val">~250 €</div></div>
+  </div>
+  <div style="margin-top:15px;font-size:1.3em;font-weight:700;color:var(--gold)">Total estimé : ~556 € / pers</div>
+  <div style="font-size:0.78em;opacity:0.7;margin-top:5px">(sans la montgolfière optionnelle à 93€)</div>
+</div>`;
+ovCard.innerHTML = ovHtml;
+mainEl.appendChild(ovCard);
+
+dayData.forEach(d => {
+  const card = document.createElement('div');
+  card.className = 'day-card'; card.id = d.id;
+  let html = `<div class="day-header">
+    <div class="day-num" style="background:${d.color}">${d.label.split(' ')[0]}<span>${d.label.split(' ')[1]||''}</span></div>
+    <div class="day-title"><h2 style="color:${d.color}">${d.date}</h2><p>📍 ${d.location}</p></div>
+  </div><div class="activities">`;
+  d.activities.forEach(a => {
+    html += `<div class="activity ${a.type}">
+      <div class="activity-icon">${a.icon}</div>
+      <div class="activity-content"><div class="name">${a.name}</div>${a.detail?`<div class="detail">${a.detail}</div>`:''}</div>
+      ${a.cost?`<div class="activity-cost">${a.cost}</div>`:''}
+    </div>`;
+  });
+  html += `</div>`;
+  if (d.costs?.length) {
+    html += `<div class="cost-summary"><h3>💸 Dépenses du jour</h3>`;
+    d.costs.forEach(c => html += `<div class="cost-row"><span>${c.label}</span><span>${c.val}</span></div>`);
+    html += `<div class="cost-row"><span>Total estimé / pers</span><span>${d.total} €</span></div></div>`;
+  }
+  card.innerHTML = html;
+  mainEl.appendChild(card);
+});
+</script>
+</body>
+</html>
